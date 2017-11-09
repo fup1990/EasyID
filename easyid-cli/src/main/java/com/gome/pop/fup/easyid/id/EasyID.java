@@ -106,7 +106,6 @@ public class EasyID {
         }
         String id = jedis.lpop(Constant.REDIS_LIST_NAME);
         if (len == 0l || null == id || "".equals(id)) {
-            Thread.sleep(100l);
             return getId(jedis, list_min_size);
         }
         return Long.valueOf(id);
