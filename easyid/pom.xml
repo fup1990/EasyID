@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.gome.fup.easyid</groupId>
+    <artifactId>EasyID</artifactId>
+    <version>STABLE-1.0.0</version>
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>EasyID-Common</module>
+        <module>EasyID-Cli</module>
+        <module>EasyID-Demo</module>
+        <module>EasyID-Server</module>
+    </modules>
+
+    <properties>
+        <junit.version>4.12</junit.version>
+        <slf4j.version>1.6.6</slf4j.version>
+        <log4j.version>1.2.16</log4j.version>
+    </properties>
+
+    <dependencies>
+        <!-- junit -->
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>${junit.version}</version>
+        </dependency>
+        <!-- log4j -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>1.6.6</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-log4j12</artifactId>
+            <version>1.6.6</version>
+        </dependency>
+        <dependency>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+            <version>1.2.16</version>
+        </dependency>
+    </dependencies>
+
+</project>
