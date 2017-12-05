@@ -27,14 +27,24 @@ EasyID是一个以snowflake算法为基础的轻量、高效的分布式主键�
 
    ![image](https://github.com/fup1990/EasyID/blob/master/EasyID%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E5%9B%BE.png)
   
+ # 编译项目
+ 
+  - 使用maven命令打包easyid:mvn clean instll -Dmaven.test.skip=true；<br/>
+  
 # 服务部署
 
  - 将本地ip地址配置到hosts文件中；<br/>
- - 使用maven命令打包easyid-server:mvn clean instll -Dmaven.test.skip=true；<br/>
  - 部署easyid-server：java -jar EasyID-Server-STABLE-1.0.jar -zookeeper127.0.0.1:2181 -redis127.0.0.1:6379<br/>
  >参数说明：<br/>
  >-zookeeper：zookeeper地址<br/>
  >-redis：redis地址<br/>
+ 
+ # 客户端
+
+ - 添加easyid-cli项目的依赖；<br/>
+ - new EasyID(zk,redis)；<br/>
+ > EasyID需要两个构造参数。其中，zk表示zookeeper的服务地址，redis表示redis的服务地址。详情请参考easy-demo项目Main.java
+ - 通过EasyID类的nextId()，获取id。<br/>
 
 # docker部署
  - docker build ![Dockerfile](https://github.com/fup1990/EasyID/blob/master/Dockerfile)
@@ -42,9 +52,4 @@ EasyID是一个以snowflake算法为基础的轻量、高效的分布式主键�
  > 注：--net=host，选用host模式设置docker的网络连接，将宿主机的ip注册到zookeeper，否则将访问不到docker服务
   
 
-# 客户端
 
- - 添加easyid-cli项目的依赖；<br/>
- - new EasyID(zk,redis)；<br/>
- > EasyID需要两个构造参数。其中，zk表示zookeeper的服务地址，redis表示redis的服务地址。详情请参考easy-demo项目Main.java
- - 通过EasyID类的nextId()，获取id。<br/>
