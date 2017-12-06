@@ -43,8 +43,8 @@ EasyID是一个以snowflake算法为基础的轻量、高效的分布式主键�
 
  - 添加easyid-cli项目的依赖；<br/>
  - new EasyID(zk,redis)；<br/>
+  - 通过EasyID类的nextId()，获取id。<br/>
  > EasyID需要两个构造参数。其中，zk表示zookeeper的服务地址，redis表示redis的服务地址。详情请参考easy-demo项目Main.java
- - 通过EasyID类的nextId()，获取id。<br/>
 
 # docker部署
  - docker build ![Dockerfile](https://github.com/fup1990/EasyID/blob/master/Dockerfile)
