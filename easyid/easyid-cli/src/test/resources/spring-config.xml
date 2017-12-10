@@ -39,7 +39,7 @@
         </property>
     </bean>
 
-    <bean id="easyID" class="com.gome.pop.fup.easyid.id.EasyID">
+    <bean id="easyID" class="com.gome.pop.fup.easyid.id.EasyIDWithRedis">
         <property name="redisTemplate" ref="redisTemplate" />
     </bean>
 

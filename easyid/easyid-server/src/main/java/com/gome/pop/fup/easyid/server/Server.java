@@ -1,11 +1,12 @@
 package com.gome.pop.fup.easyid.server;
 
 import com.gome.pop.fup.easyid.handler.DecoderHandler;
+import com.gome.pop.fup.easyid.handler.EncoderHandler;
 import com.gome.pop.fup.easyid.handler.Handler;
 import com.gome.pop.fup.easyid.model.Request;
 import com.gome.pop.fup.easyid.snowflake.Snowflake;
-import com.gome.pop.fup.easyid.util.*;
-import com.gome.pop.fup.easyid.zk.ZkClient;
+import com.gome.pop.fup.easyid.util.Constant;
+import com.gome.pop.fup.easyid.util.IpUtil;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.ChannelFuture;
@@ -16,10 +17,6 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import org.apache.log4j.Logger;
-import org.apache.zookeeper.KeeperException;
-import redis.clients.jedis.ShardedJedis;
-
-import java.io.IOException;
 
 /**
  * 服务端，接收创建id的请求
@@ -29,62 +26,19 @@ public class Server {
 
     private static final Logger logger = Logger.getLogger(Server.class);
 
-    private Snowflake snowflake;
+    private Snowflake snowflake = new Snowflake();
 
-    private ZkClient zkClient;
+    private AcceptThread acceptThread;
 
-    private String redisAddress;
-
-    private String zookeeperAddres;
-
-    private JedisUtil jedisUtil;
-
-    public Server(String zookeeperAddres, String redisAddress) {
-        this.zookeeperAddres = zookeeperAddres;
-        this.redisAddress = redisAddress;
-    }
-
-    public void start() throws Exception {
-        snowflake = new Snowflake();
-        jedisUtil = JedisUtil.newInstance(redisAddress);
-        String localHost = IpUtil.getLocalHost();
-        Cache.set(Constant.LOCALHOST, localHost, -1l);
-        zkClient = new ZkClient(zookeeperAddres);
-        zkClient.register(localHost);
-        //查看redis中是否有id,没有则创建
-        pushIdsInRedis();
-        logger.info("EasyID Server started!");
+    public void startup() {
+        logger.info("Server starting");
+        acceptThread = new AcceptThread();
+        acceptThread.start();
         Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
             public void run() {
-                zkClient.close();
-                jedisUtil.close();
+                Server.this.close();
             }
         }));
-        //启动服务
-        AcceptThread acceptThread = new AcceptThread();
-        acceptThread.start();
-    }
-
-    public void pushIdsInRedis() throws KeeperException, InterruptedException {
-        ShardedJedis jedis = jedisUtil.getJedis();
-        String ip = (String) Cache.get(Constant.LOCALHOST);
-        try {
-            int redis_list_size = zkClient.getRedisListSize();
-            Long len = jedis.llen(Constant.REDIS_LIST_NAME);
-            if (null == len) len = 0l;
-            if (len < (redis_list_size * 300)) {
-                //批量生成id
-                long[] ids = snowflake.nextIds((redis_list_size * 1000) - len.intValue());
-                String[] strs = ConversionUtil.longsToStrings(ids);
-                //将生成的id存入redis队列
-                jedis.rpush(Constant.REDIS_LIST_NAME, strs);
-                jedis.expire(Constant.REDIS_LIST_NAME, 1800);
-            }
-        } finally {
-            jedisUtil.returnResource(jedis);
-            //zkClient.increase(ip);
-            new Thread(new IncreaseRunnable(zkClient, ip)).start();
-        }
     }
 
     /**
@@ -99,6 +53,7 @@ public class Server {
         private ServerBootstrap bootstrap;
 
         public AcceptThread() {
+            logger.info("AcceptThread starting");
             bossGroup = new NioEventLoopGroup(1);
             workerGroup = new NioEventLoopGroup(8);
             bootstrap = new ServerBootstrap();
@@ -112,7 +67,8 @@ public class Server {
                                 throws Exception {
                             socketChannel.pipeline()
                                     .addLast(new DecoderHandler(Request.class))
-                                    .addLast(new Handler(Server.this, jedisUtil));
+                                    .addLast(new EncoderHandler())
+                                    .addLast(new Handler(Server.this));
                         }
                     }).option(ChannelOption.SO_BACKLOG, 128)
                     .childOption(ChannelOption.SO_KEEPALIVE, true)
@@ -123,40 +79,25 @@ public class Server {
         @Override
         public void run() {
             try {
-                ChannelFuture future = bootstrap.bind(IpUtil.getLocalHost(), Constant.EASYID_SERVER_PORT).sync();
-                future.channel().closeFuture().sync();
+                String host = IpUtil.getLocalHost();
+                int port = Constant.EASYID_SERVER_PORT;
+                ChannelFuture channelFuture = bootstrap.bind(host, port).sync();
+                channelFuture.channel().closeFuture().sync();
             } catch (Exception e) {
                 e.printStackTrace();
                 logger.error(e.getMessage());
-            } finally {
-                workerGroup.shutdownGracefully();
-                bossGroup.shutdownGracefully();
+                close();
             }
+        }
+
+        public void close() {
+            workerGroup.shutdownGracefully();
+            bossGroup.shutdownGracefully();
         }
     }
 
-    private class IncreaseRunnable implements Runnable {
-
-        private ZkClient zkClient;
-
-        private String ip;
-
-        public IncreaseRunnable(ZkClient zkClient, String ip) {
-            this.zkClient = zkClient;
-            this.ip = ip;
-        }
-
-        public void run() {
-            try {
-                zkClient.increase(ip);
-            } catch (KeeperException e) {
-                e.printStackTrace();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
+    public void close() {
+        acceptThread.close();
     }
 
     public Snowflake getSnowflake() {
@@ -165,29 +106,5 @@ public class Server {
 
     public void setSnowflake(Snowflake snowflake) {
         this.snowflake = snowflake;
-    }
-
-    public ZkClient getZkClient() {
-        return zkClient;
-    }
-
-    public void setZkClient(ZkClient zkClient) {
-        this.zkClient = zkClient;
-    }
-
-    public String getZookeeperAddres() {
-        return zookeeperAddres;
-    }
-
-    public void setZookeeperAddres(String zookeeperAddres) {
-        this.zookeeperAddres = zookeeperAddres;
-    }
-
-    public String getRedisAddress() {
-        return redisAddress;
-    }
-
-    public void setRedisAddress(String redisAddress) {
-        this.redisAddress = redisAddress;
     }
 }

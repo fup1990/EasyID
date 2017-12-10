@@ -1,0 +1,107 @@
+package com.gome.pop.fup.easyid;
+
+import com.gome.pop.fup.easyid.handler.DecoderHandler;
+import com.gome.pop.fup.easyid.handler.EncoderHandler;
+import com.gome.pop.fup.easyid.model.Request;
+import com.gome.pop.fup.easyid.model.Response;
+import com.gome.pop.fup.easyid.util.Constant;
+import com.gome.pop.fup.easyid.util.IpUtil;
+import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.*;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioSocketChannel;
+
+import java.util.concurrent.CountDownLatch;
+
+/**
+ * Created by fupeng on 2017/12/10.
+ */
+public class Client {
+
+    private Response response;
+
+    private CountDownLatch latch = new CountDownLatch(1);
+
+    public static void main(String[] args) {
+        Client client = new Client();
+        Response resp = client.send();
+        System.out.println("Response:" + resp);
+    }
+
+    private Response send() {
+        EventLoopGroup group = new NioEventLoopGroup();
+        try {
+            Bootstrap bootstrap = new Bootstrap();
+            bootstrap.group(group).channel(NioSocketChannel.class)
+                    .handler(new ChannelInitializer<SocketChannel>() {
+
+                        @Override
+                        protected void initChannel(SocketChannel ch)
+                                throws Exception {
+                            ch.pipeline()
+                                    //.addLast(new IdleStateHandler(0,4,0, TimeUnit.SECONDS))
+                                    .addLast(new EncoderHandler())
+                                    .addLast(new DecoderHandler(Response.class))
+                                    .addLast(new ResponseHandler(Client.this));
+                            //.addLast(new HeartClientHandler());
+                            // .addLast(QueueSender.this);
+                        }
+                    }).option(ChannelOption.SO_KEEPALIVE, true);
+            // 链接服务器
+            ChannelFuture future = bootstrap.connect(IpUtil.getLocalHost(), Constant.EASYID_SERVER_PORT).sync();
+            // 将request对象写入outbundle处理后发出
+            future.channel().writeAndFlush(new Request()).sync();
+
+            // synchronized (obj) {
+            // 用线程等待的方式决定是否关闭连接
+            // 其意义是：先在此阻塞，等待获取到服务端的返回后，被唤醒，从而关闭网络连接
+            // obj.wait();
+            // }
+            latch.await();
+            if (response != null && response.isFinish()) {
+                // 服务器同步连接断开时,这句代码才会往下执行
+                future.channel().closeFuture().sync();
+                return response;
+            }
+            // if (response != null) {
+
+            // }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            group.shutdownGracefully();
+        }
+        return new Response();
+    }
+
+    static class ResponseHandler extends SimpleChannelInboundHandler<Response>{
+
+        private Client client;
+
+        public ResponseHandler(Client client) {
+            this.client = client;
+        }
+
+        protected void channelRead0(ChannelHandlerContext channelHandlerContext, Response response) throws Exception {
+            client.setResponse(response);
+            client.getLatch().countDown();
+        }
+    }
+
+    public Response getResponse() {
+        return response;
+    }
+
+    public void setResponse(Response response) {
+        this.response = response;
+    }
+
+    public CountDownLatch getLatch() {
+        return latch;
+    }
+
+    public void setLatch(CountDownLatch latch) {
+        this.latch = latch;
+    }
+}
