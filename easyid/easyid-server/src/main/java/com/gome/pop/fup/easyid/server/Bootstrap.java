@@ -41,11 +41,7 @@ public class Bootstrap {
         ZkClient zkClient = server.getZkClient();
         Snowflake snowflake = server.getSnowflake();
         int size = zkClient.getRootChildrenSize();
-        if (size > 31) {
-            int times = size/31;
-            size = size - (31 * times);
-        }
-        snowflake.setWorkerId(size);
-        snowflake.setWorkerId(size);
+        snowflake.setWorkerId(size % 31);
+        snowflake.setDatacenterId(size % 31);
     }
 }
